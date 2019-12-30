@@ -1,72 +1,64 @@
-import { LitElement, html } from "lit-element";
+import { LitElement, html, customElement, property } from "lit-element";
 import { repeat } from "lit-html/directives/repeat";
-import { bezier } from "bezier-easing";
+import bezier from "bezier-easing";
 
 import style from "./ar-picker-css";
 
 const ITEM_HEIGHT = 24;
 const EFFECTIVELY_ZERO = 1e-10;
 
-const approxEq = (value1, value2, delta = EFFECTIVELY_ZERO) => Math.abs(value1 - value2) <= delta;
+const approxEq = (value1: number, value2: number, delta = EFFECTIVELY_ZERO) => Math.abs(value1 - value2) <= delta;
+
+type ItemType = string;
 
 /**
  * `<ar-picker>` is a minimal cupertino style picker which allows user to pick
  * an item from the list.
  *
- * @customElement
- * @polymer
- * @extends HTMLElement
- *
  */
-class Picker extends LitElement {
-    static get properties() {
-        return {
-            /**
-             * Time taken (in milliseconds) for scrolling between two stable positions.
-             * This may get shrunken down when scrolled with higher energies.
-             */
-            animationDuration: { type: Number, reflect: true, hasChanged: () => false },
+@customElement("ar-picker")
+export class Picker extends LitElement {
+    private pendingScroll = 0;
+    private currentScroll = 0;
+    private isExternalForceActive = false;
 
-            /**
-             * List of items to be displayed in the wheel
-             */
-            items: { type: Array },
+    private easingFunction: any;
+    private inverseEasingFunction: any;
+    private selectedItem: any;
+    private animating: number | null = null;
+    private lastTimestamp: number | null = null;
+    private trackedTouch: Touch | null = null;
+    private debounceTimer: number | null = null;
 
-            /**
-             * The last selected item.
-             * WARNING: The wheel may be animating. Prefer using events to obtain the selected item.
-             */
-            _selectedItem: { type: Object },
-        };
-    }
+    /**
+     * Time taken (in milliseconds) for scrolling between two stable positions.
+     * This may get shrunken down when scrolled with higher energies.
+     */
+    @property({ type: Number, hasChanged: () => false })
+    animationDuration = 180;
+
+    /**
+     * List of items to be displayed in the wheel
+     */
+    @property({ type: Array })
+    items: ItemType[] = [];
 
     constructor() {
         super();
-
-        this._pendingScroll = 0;
-        this._currentScroll = 0;
-        this._is_isExternalForceActiveActive = false;
-
-        this.animationDuration = 180;
-        this.bezierCurve = [0.785, 0.135, 0.15, 0.86];
-        this._animatePhysics = this._animatePhysics.bind(this);
+        this.initEasingFunctions(0.785, 0.135, 0.15, 0.86);
+        this.animatePhysics = this.animatePhysics.bind(this);
     }
 
     /**
-     * Array of numbers.
-     * [x1, y1, x2, y2] where (x1, y1) and (x2, y2) are control points which forms convex hull of
-     * the curve.
+     * (x1, y1) and (x2, y2) are control points which forms convex hull of the curve.
      */
-    set bezierCurve(value) {
-        const generateEasingFunctions = (x1, y1, x2, y2) => [
-            bezier(x1, y1, x2, y2), bezier(y1, x1, y2, x2),
-        ];
-
-        [this.easingFunction, this.inverseEasingFunction] = generateEasingFunctions(...value);
+    private initEasingFunctions(x1: number, y1: number, x2: number, y2: number) {
+        this.easingFunction = bezier(x1, y1, x2, y2);
+        this.inverseEasingFunction = bezier(y1, x1, y2, x2);
     }
 
     get _selectedIndex() {
-        return Math.round(this._currentScroll / ITEM_HEIGHT);
+        return Math.round(this.currentScroll / ITEM_HEIGHT);
     }
 
     renderStyle() {
@@ -121,11 +113,11 @@ class Picker extends LitElement {
                 }
             </style>
             <div id="container"
-                @wheel=${{ handleEvent: this._onWheelHandler.bind(this), passive: true }} 
-                @touchstart=${{ handleEvent: this._onTouchStart.bind(this), passive: true }}
-                @touchend=${{ handleEvent: this._onTouchEnd.bind(this), passive: true }}
-                @touchmove=${{ handleEvent: this._onTouchMove.bind(this), passive: true }}
-                @keydown=${{ handleEvent: this._onKeyDown.bind(this), passive: true }}
+                @wheel=${{ handleEvent: this.onWheelHandler.bind(this), passive: true }} 
+                @touchstart=${{ handleEvent: this.onTouchStart.bind(this), passive: true }}
+                @touchend=${{ handleEvent: this.onTouchEnd.bind(this), passive: true }}
+                @touchmove=${{ handleEvent: this.onTouchMove.bind(this), passive: true }}
+                @keydown=${{ handleEvent: this.onKeyDown.bind(this), passive: true }}
                 tabindex="-1">
                 <div id="wheel">
                     <div class="whitespace start"></div>
@@ -143,84 +135,85 @@ class Picker extends LitElement {
         `;
     }
 
-    renderItem(item) {
-        return html`<div class="item" @click=${this._onItemClick} .data-value=${item}>${item}</div>`;
+    renderItem(item: ItemType) {
+        return html`<div class="item" @click=${this.onItemClick} data-value="${item}">${item}</div>`;
     }
 
     updated() {
-        this._applyPhysics();
+        this.applyPhysics();
     }
 
-    _stopAnimation() {
-        this._pendingScroll = 0;
-        this._lastTimestamp = null;
+    private stopAnimation() {
+        this.pendingScroll = 0;
+        this.lastTimestamp = null;
 
-        if (this._animating) {
-            cancelAnimationFrame(this._animating);
-            this._animating = null;
+        if (this.animating) {
+            cancelAnimationFrame(this.animating);
+            this.animating = null;
         }
 
-        return this._animating;
+        return this.animating;
     }
 
-    _startPhysicsAnimation() {
-        if (!this._animating) {
-            requestAnimationFrame(this._animatePhysics);
+    private startPhysicsAnimation() {
+        if (!this.animating) {
+            requestAnimationFrame(this.animatePhysics);
         }
     }
 
-    _animatePhysics(now) {
-        if (!this._lastTimestamp) {
+    private animatePhysics(now: number) {
+        if (!this.lastTimestamp) {
             // setup timestamp and wait until next frame
-            this._lastTimestamp = now;
-            this._animating = requestAnimationFrame(this._animatePhysics);
+            this.lastTimestamp = now;
+            this.animating = requestAnimationFrame(this.animatePhysics);
 
-            return this._animating;
+            return this.animating;
         }
 
         // sentinel checks
-        if ((this._currentScroll === 0 && this._pendingScroll < 0)
-            || (this._currentScroll >= ITEM_HEIGHT * (this.items.length - 1)
-                && this._pendingScroll > 0)) {
+        if ((this.currentScroll === 0 && this.pendingScroll < 0)
+            || (this.currentScroll >= ITEM_HEIGHT * (this.items.length - 1)
+                && this.pendingScroll > 0)) {
             // hard absorption of any remaining force. TODO momentum scrolling
-            this._pendingScroll = 0;
+            this.pendingScroll = 0;
         }
 
         // stability check
-        if (approxEq(this._pendingScroll, 0)) {
-            if (this._isWheelStable()) {
-                return this._onWheelStable();
+        if (approxEq(this.pendingScroll, 0)) {
+            if (this.isWheelStable()) {
+                return this.onWheelStable();
             }
-            this._stabilizeWheel();
-            this._lastTimestamp = now;
-            this._animating = requestAnimationFrame(this._animatePhysics);
+            this.stabilizeWheel();
+            this.lastTimestamp = now;
+            this.animating = requestAnimationFrame(this.animatePhysics);
 
-            return this._animating;
+            return this.animating;
         }
 
-        const delta = now - this._lastTimestamp;
+        const delta = now - this.lastTimestamp;
 
         // Measures the offset distance from previous stable position.
-        const scrollOffset = this._pendingScroll > 0
-            ? (ITEM_HEIGHT + this._currentScroll) % ITEM_HEIGHT
-            : (ITEM_HEIGHT - (this._currentScroll % ITEM_HEIGHT)) % ITEM_HEIGHT;
+        const scrollOffset = this.pendingScroll > 0
+            ? (ITEM_HEIGHT + this.currentScroll) % ITEM_HEIGHT
+            : (ITEM_HEIGHT - (this.currentScroll % ITEM_HEIGHT)) % ITEM_HEIGHT;
 
         // defense mechanism
         if (scrollOffset < 0) {
-            throw new RangeError("Not supposed to happen. One of the sentinel checks should have catched this.", {
+            console.debug('Error context: ', {
                 scrollOffset,
-                _pendingScroll: this._pendingScroll,
-                _currentScroll: this._currentScroll,
+                pendingScroll: this.pendingScroll,
+                currentScroll: this.currentScroll,
                 delta,
-                _lastTimestamp: this._lastTimestamp,
+                lastTimestamp: this.lastTimestamp,
                 now,
             });
+            throw new RangeError("Not supposed to happen. One of the sentinel checks should have catched this.", );
         }
 
         // shrink animation time based on force applied
         const shrunkenAnimationTime = Math.min(
             this.animationDuration,
-            this.animationDuration * ITEM_HEIGHT / Math.abs(this._pendingScroll),
+            this.animationDuration * ITEM_HEIGHT / Math.abs(this.pendingScroll),
         );
 
         // estimate time taken for scroll offset
@@ -231,50 +224,50 @@ class Picker extends LitElement {
             - this.easingFunction(Math.min(1, t / shrunkenAnimationTime)) * ITEM_HEIGHT;
 
         // apply maximum limits
-        dx = Math.sign(this._pendingScroll) * Math.min(Math.abs(this._pendingScroll), dx);
+        dx = Math.sign(this.pendingScroll) * Math.min(Math.abs(this.pendingScroll), dx);
 
         // animate scroll
-        this._currentScroll = Math.max(
+        this.currentScroll = Math.max(
             0,
-            Math.min(ITEM_HEIGHT * this.items.length, this._currentScroll + dx),
+            Math.min(ITEM_HEIGHT * this.items.length, this.currentScroll + dx),
         );
-        if (approxEq(this._currentScroll, Math.round(this._currentScroll))) {
-            this._currentScroll = Math.round(this._currentScroll);
+        if (approxEq(this.currentScroll, Math.round(this.currentScroll))) {
+            this.currentScroll = Math.round(this.currentScroll);
         }
 
-        this._applyPhysics();
+        this.applyPhysics();
 
         // compute animation params for next frame
-        this._pendingScroll -= dx;
-        this._lastTimestamp = now;
+        this.pendingScroll -= dx;
+        this.lastTimestamp = now;
 
-        this._animating = requestAnimationFrame(this._animatePhysics);
+        this.animating = requestAnimationFrame(this.animatePhysics);
 
-        return this._animating;
+        return this.animating;
     }
 
-    _applyPhysics() {
-        const container = this.shadowRoot.querySelector("#container");
+    private applyPhysics() {
+        const container = this.shadowRoot!.querySelector<HTMLElement>("#container");
 
-        this.shadowRoot.querySelectorAll("#container .item").forEach((item, i) => {
+        this.shadowRoot?.querySelectorAll<HTMLElement>("#container .item").forEach((item, i) => {
             let angle = 0;
-            let dy = -this._currentScroll;
+            let dy = -this.currentScroll;
             let scale = 1;
 
-            if (Math.abs(i * ITEM_HEIGHT - this._currentScroll) < container.offsetHeight / 2) {
-                angle = (i * ITEM_HEIGHT - this._currentScroll) / (container.offsetHeight / 2)
+            if (Math.abs(i * ITEM_HEIGHT - this.currentScroll) < container!.offsetHeight / 2) {
+                angle = (i * ITEM_HEIGHT - this.currentScroll) / (container!.offsetHeight / 2)
                     * Math.PI / 2;
-                dy = (container.offsetHeight / 2) * Math.sin(angle) - i * ITEM_HEIGHT;
+                dy = (container!.offsetHeight / 2) * Math.sin(angle) - i * ITEM_HEIGHT;
                 scale = 1 + 0.4 * (1 - Math.abs(angle / Math.PI * 2));
 
-                item.classList.toggle("selected", Math.abs(i * ITEM_HEIGHT - this._currentScroll) < ITEM_HEIGHT / 2);
+                item.classList.toggle("selected", Math.abs(i * ITEM_HEIGHT - this.currentScroll) < ITEM_HEIGHT / 2);
             }
 
-            if (i * ITEM_HEIGHT - this._currentScroll >= container.offsetHeight / 2) {
+            if (i * ITEM_HEIGHT - this.currentScroll >= container!.offsetHeight / 2) {
                 dy += ITEM_HEIGHT;
             }
 
-            if (this._currentScroll - i * ITEM_HEIGHT >= container.offsetHeight / 2) {
+            if (this.currentScroll - i * ITEM_HEIGHT >= container!.offsetHeight / 2) {
                 dy -= ITEM_HEIGHT;
             }
 
@@ -282,122 +275,126 @@ class Picker extends LitElement {
         });
     }
 
-    _isWheelStable() {
-        if (approxEq(this._pendingScroll, 0)) {
-            this._pendingScroll = 0;
+    private isWheelStable() {
+        if (approxEq(this.pendingScroll, 0)) {
+            this.pendingScroll = 0;
 
-            return approxEq(this._currentScroll % ITEM_HEIGHT, 0) // is current position stable
-                || this._isExternalForceActive;
+            return approxEq(this.currentScroll % ITEM_HEIGHT, 0) // is current position stable
+                || this.isExternalForceActive;
         }
 
         return false;
     }
 
-    _onWheelStable() {
+    private onWheelStable() {
         const selectedIndex = this._selectedIndex;
 
-        if (!this._isExternalForceActive && this._selectedItem !== this.items[selectedIndex]) {
-            this._selectedItem = this.items[selectedIndex];
+        if (!this.isExternalForceActive && this.selectedItem !== this.items[selectedIndex]) {
+            this.selectedItem = this.items[selectedIndex];
 
             this.dispatchEvent(new CustomEvent("select", {
-                detail: { selected: this._selectedItem },
+                detail: { selected: this.selectedItem },
             }));
         }
 
-        return this._stopAnimation();
+        return this.stopAnimation();
     }
 
-    _stabilizeWheel() {
-        if (this._currentScroll % ITEM_HEIGHT > ITEM_HEIGHT / 2) {
-            this._pendingScroll = ITEM_HEIGHT - (this._currentScroll % ITEM_HEIGHT);
+    private stabilizeWheel() {
+        if (this.currentScroll % ITEM_HEIGHT > ITEM_HEIGHT / 2) {
+            this.pendingScroll = ITEM_HEIGHT - (this.currentScroll % ITEM_HEIGHT);
         } else {
-            this._pendingScroll = -(this._currentScroll % ITEM_HEIGHT);
+            this.pendingScroll = -(this.currentScroll % ITEM_HEIGHT);
         }
 
-        this._startPhysicsAnimation();
+        this.startPhysicsAnimation();
     }
 
-    _onItemClick(event) {
-        const whitespaceElement = this.shadowRoot.querySelector(".whitespace.start");
-        const clickedItem = event.path[0].closest("div.item");
+    private onItemClick(event: MouseEvent) {
+        const whitespaceElement = this.shadowRoot!.querySelector<HTMLElement>(".whitespace.start");
+        const clickedItem = (event.composedPath()[0] as HTMLElement).closest<HTMLElement>("div.item");
 
-        this._pendingScroll += clickedItem.offsetTop
-        - (this._currentScroll + whitespaceElement.offsetTop + whitespaceElement.offsetHeight);
-        this._startPhysicsAnimation();
+        this.pendingScroll += clickedItem!.offsetTop
+        - (this.currentScroll + whitespaceElement!.offsetTop + whitespaceElement!.offsetHeight);
+        this.startPhysicsAnimation();
 
         this.dispatchEvent(new CustomEvent("select", {
             detail: {
-                selected: clickedItem["data-value"],
+                selected: clickedItem!.getAttribute("data-value"),
             },
         }));
     }
 
-    _onKeyDown(event) {
+    private onKeyDown(event: KeyboardEvent) {
         if (event.key === "ArrowUp") {
-            this._pendingScroll -= ITEM_HEIGHT;
-            this._startPhysicsAnimation();
+            this.pendingScroll -= ITEM_HEIGHT;
+            this.startPhysicsAnimation();
         } else if (event.key === "ArrowDown") {
-            this._pendingScroll += ITEM_HEIGHT;
-            this._startPhysicsAnimation();
+            this.pendingScroll += ITEM_HEIGHT;
+            this.startPhysicsAnimation();
         }
     }
 
-    _onTouchStart(event) {
+    private onTouchStart(event: TouchEvent) {
         if (!this.trackedTouch) {
             [this.trackedTouch] = event.changedTouches;
-            this._isExternalForceActive = true;
+            this.isExternalForceActive = true;
         }
     }
 
-    _onTouchEnd(event) {
+    private onTouchEnd(event: TouchEvent) {
         if (this.trackedTouch && Array.from(event.changedTouches)
-            .find(touch => touch.identifier === this.trackedTouch.identifier)) {
+            .find(touch => touch.identifier === this.trackedTouch!.identifier)) {
             this.trackedTouch = null;
-            this._isExternalForceActive = false;
+            this.isExternalForceActive = false;
 
-            this._startPhysicsAnimation();
+            this.startPhysicsAnimation();
         }
     }
 
-    _onTouchMove(event) {
+    private onTouchMove(event: TouchEvent) {
         const currentTouch = this.trackedTouch && Array.from(event.changedTouches)
-            .find(touch => touch.identifier === this.trackedTouch.identifier);
+            .find(touch => touch.identifier === this.trackedTouch!.identifier);
 
         if (currentTouch) {
-            this._pendingScroll += this.trackedTouch.screenY - currentTouch.screenY;
-            this._startPhysicsAnimation();
+            this.pendingScroll += this.trackedTouch!.screenY - currentTouch.screenY;
+            this.startPhysicsAnimation();
 
             this.trackedTouch = currentTouch;
         }
     }
 
-    _onWheelHandler(event) {
+    private onWheelHandler(event: WheelEvent) {
         const smoothScroll = event.deltaY === Math.round(event.deltaY);
 
         if (!smoothScroll) {
             // assuming trackpad scroll
-            this._isExternalForceActive = true;
+            this.isExternalForceActive = true;
 
-            if (this._debounceTimer) {
-                clearTimeout(this._debounceTimer);
+            if (this.debounceTimer) {
+                clearTimeout(this.debounceTimer);
             }
 
-            this._debounceTimer = setTimeout(() => {
-                this._isExternalForceActive = false;
-                this._debounceTimer = null;
-                if (!this._isWheelStable()) {
-                    this._stabilizeWheel();
+            this.debounceTimer = setTimeout(() => {
+                this.isExternalForceActive = false;
+                this.debounceTimer = null;
+                if (!this.isWheelStable()) {
+                    this.stabilizeWheel();
                 }
             }, 600);
 
-            this._pendingScroll += event.deltaY;
-            this._startPhysicsAnimation();
+            this.pendingScroll += event.deltaY;
+            this.startPhysicsAnimation();
         } else {
             // assuming mousewheel scroll
-            this._pendingScroll += Math.floor(event.deltaY / ITEM_HEIGHT) * ITEM_HEIGHT;
-            this._startPhysicsAnimation();
+            this.pendingScroll += Math.floor(event.deltaY / ITEM_HEIGHT) * ITEM_HEIGHT;
+            this.startPhysicsAnimation();
         }
     }
 }
 
-customElements.define("ar-picker", Picker);
+declare global {
+    interface HTMLElementTagNameMap {
+        'ar-picker': Picker;
+    }
+}

@@ -1,0 +1,49 @@
+dependencies:
+  '@rush-temp/ar-picker': 'file:projects/ar-picker.tgz'
+  bezier-easing: 2.1.0
+  lit-element: 2.2.1
+  lit-html: 1.1.2
+  typescript: 3.7.4
+packages:
+  /bezier-easing/2.1.0:
+    dev: false
+    resolution:
+      integrity: sha1-wE3+i5JtbsrKGBPWn/F5t8ICXYY=
+  /lit-element/2.2.1:
+    dependencies:
+      lit-html: 1.1.2
+    dev: false
+    resolution:
+      integrity: sha512-ipDcgQ1EpW6Va2Z6dWm79jYdimVepO5GL0eYkZrFvdr0OD/1N260Q9DH+K5HXHFrRoC7dOg+ZpED2XE0TgGdXw==
+  /lit-html/1.1.2:
+    dev: false
+    resolution:
+      integrity: sha512-FFlUMKHKi+qG1x1iHNZ1hrtc/zHmfYTyrSvs3/wBTvaNtpZjOZGWzU7efGYVpgp6KvWeKF6ql9/KsCq6Z/mEDA==
+  /typescript/3.7.4:
+    dev: false
+    engines:
+      node: '>=4.2.0'
+    hasBin: true
+    resolution:
+      integrity: sha512-A25xv5XCtarLwXpcDNZzCGvW2D1S3/bACratYBx2sax8PefsFhlYmkQicKHvpYflFS8if4zne5zT5kpJ7pzuvw==
+  'file:projects/ar-picker.tgz':
+    dependencies:
+      bezier-easing: 2.1.0
+      lit-element: 2.2.1
+      lit-html: 1.1.2
+      typescript: 3.7.4
+    dev: false
+    name: '@rush-temp/ar-picker'
+    resolution:
+      integrity: sha512-kyKwRor7w8iuZUmjVyWp2ElK6jr1ut+DS3DjsE4OdgB5VDCneC0ygKEuf2krD2Ndx5x3zRj5ZTuRepmEiiddCQ==
+      tarball: 'file:projects/ar-picker.tgz'
+    version: 0.0.0
+registry: 'https://registry.npmjs.org/'
+shrinkwrapMinorVersion: 9
+shrinkwrapVersion: 3
+specifiers:
+  '@rush-temp/ar-picker': 'file:./projects/ar-picker.tgz'
+  bezier-easing: ^2.1.0
+  lit-element: ^2.2.1
+  lit-html: ^1.0.0
+  typescript: ~3.7.4

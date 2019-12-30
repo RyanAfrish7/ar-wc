@@ -2,6 +2,9 @@
   "name": "@ryanafrish7/ar-picker",
   "version": "0.0.1-alpha.2",
   "description": "A minimalist picker web-component inspired by Cupertino (iOS style) Picker widget.",
+  "scripts": {
+    "build": "tsc"
+  },
   "keywords": [
     "picker",
     "lit-element"
@@ -9,8 +12,11 @@
   "author": "Afrish Khan S <ryanafrish7@gmail.com>",
   "license": "MIT",
   "dependencies": {
-    "bezier-easing": "git+https://github.com/RyanAfrish7/bezier-easing.git",
-    "lit-element": "^2.1.0",
+    "bezier-easing": "^2.1.0",
+    "lit-element": "^2.2.1",
     "lit-html": "^1.0.0"
+  },
+  "devDependencies": {
+    "typescript": "~3.7.4"
   }
 }
