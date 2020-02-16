@@ -9,12 +9,14 @@
     "picker",
     "lit-element"
   ],
+  "main": "dist/ar-picker.js",
   "author": "Afrish Khan S <ryanafrish7@gmail.com>",
   "license": "MIT",
   "dependencies": {
     "bezier-easing": "^2.1.0",
     "lit-element": "^2.2.1",
-    "lit-html": "^1.0.0"
+    "lit-html": "^1.0.0",
+    "lit-preview": "~0.0.0"
   },
   "devDependencies": {
     "typescript": "~3.7.4"

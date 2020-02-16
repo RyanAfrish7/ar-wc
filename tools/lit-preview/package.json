@@ -1,0 +1,33 @@
+{
+  "name": "lit-preview",
+  "version": "0.0.0",
+  "description": "Web component development sandbox",
+  "scripts": {
+    "build": "npm run build-app && npm run build-app-static && npm run build-lib",
+    "build-app": "tsc --project src/app/",
+    "build-app-static": "tsc --project src/app/static/",
+    "build-lib": "tsc"
+  },
+  "keywords": [
+    "lit-element",
+    "web-component"
+  ],
+  "main": "./dist/index.js",
+  "author": "Afrish Khan S <ryanafrish7@gmail.com>",
+  "license": "MIT",
+  "dependencies": {
+    "@rollup/plugin-commonjs": "~11.0.2",
+    "@rollup/plugin-node-resolve": "~7.1.1",
+    "@types/express": "~4.17.2",
+    "@types/webpack": "~4.41.5",
+    "express": "~4.17.1",
+    "lit-element": "~2.2.1",
+    "lit-html": "~1.1.2",
+    "reflect-metadata": "~0.1.13",
+    "rollup": "~1.31.0",
+    "strip-json-comments": "~3.0.1"
+  },
+  "devDependencies": {
+    "typescript": "~3.7.4"
+  }
+}

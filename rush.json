@@ -306,6 +306,10 @@
     {
       "packageName": "@ryanafrish7/ar-picker",
       "projectFolder": "components/ar-picker"
+    },
+    {
+      "packageName": "lit-preview",
+      "projectFolder": "tools/lit-preview"
     }
     // {
     //   /**

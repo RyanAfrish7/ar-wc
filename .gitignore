@@ -63,5 +63,7 @@ common/temp/**
 .rush/temp/**
 
 # Generated files
-**/dist
+dist
+build
+*.build.log
 node_modules

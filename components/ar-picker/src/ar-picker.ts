@@ -1,5 +1,6 @@
 import { LitElement, html, customElement, property } from "lit-element";
 import { repeat } from "lit-html/directives/repeat";
+import { preview } from "lit-preview";
 import bezier from "bezier-easing";
 
 import style from "./ar-picker-css";
@@ -390,6 +391,12 @@ export class Picker extends LitElement {
             this.pendingScroll += Math.floor(event.deltaY / ITEM_HEIGHT) * ITEM_HEIGHT;
             this.startPhysicsAnimation();
         }
+    }
+
+    @preview("Astrological Signs")
+    static example_1() {
+        const signs = ["Aries", "Aquarius", "Cancer", "Capricorn", "Gemini", "Leo", "Libra", "Ophiuchus", "Pisces", "Sagittarius", "Scorpio", "Taurus", "Virgo"];
+        return html`<ar-picker style="height: 240px; width: 360px; border: 2px solid #444" .items=${signs}></ar-picker>`;
     }
 }
 

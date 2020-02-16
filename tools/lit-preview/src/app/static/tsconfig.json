@@ -1,0 +1,9 @@
+{
+  "compilerOptions": {
+    "module": "ES6",
+    "rootDir": "../../../src",
+    "outDir": "../../../dist",
+    "moduleResolution": "Node",
+    "experimentalDecorators": true
+  },
+}

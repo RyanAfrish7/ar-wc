@@ -1,0 +1,12 @@
+{
+  "files": [
+    "lit-preview.ts"
+  ],
+  "compilerOptions": {
+    "module": "CommonJS",
+    "esModuleInterop": true,
+    "sourceMap": true,
+    "rootDir": "../../src",
+    "outDir": "../../dist"
+  }
+}
